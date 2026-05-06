@@ -103,11 +103,28 @@ echo "→ выбери канал → нажми «Разрешить»"
 echo "→ перебросит на oauth.senler.ru/blank.html?code=XXXX&state=...&group_id=NNNN"
 echo ""
 
-# Try opening in browser
-if command -v open >/dev/null 2>&1; then
-  read -p "Открыть URL автоматически в браузере? [Y/n] " OPEN_AUTO
-  if [ "$OPEN_AUTO" != "n" ] && [ "$OPEN_AUTO" != "N" ]; then
-    open "$AUTH_URL"
+# Try opening in browser (cross-platform: macOS/Linux/Windows-bash)
+open_url() {
+  local url="$1"
+  if command -v open >/dev/null 2>&1; then
+    open "$url" 2>/dev/null && return 0      # macOS
+  fi
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$url" 2>/dev/null && return 0  # Linux
+  fi
+  if command -v start >/dev/null 2>&1; then
+    start "$url" 2>/dev/null && return 0     # Windows cmd
+  fi
+  if command -v cmd.exe >/dev/null 2>&1; then
+    cmd.exe /c start "$url" 2>/dev/null && return 0  # WSL/Git Bash
+  fi
+  return 1
+}
+
+read -p "Открыть URL автоматически в браузере? [Y/n] " OPEN_AUTO
+if [ "$OPEN_AUTO" != "n" ] && [ "$OPEN_AUTO" != "N" ]; then
+  if ! open_url "$AUTH_URL"; then
+    echo -e "${C_YELLOW}[!] Не удалось открыть автоматически — скопируй URL выше вручную${C_RESET}"
   fi
 fi
 
