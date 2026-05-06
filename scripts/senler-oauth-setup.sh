@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# senler-oauth-setup.sh — интерактивный мастер OAuth-настройки
-# Проводит пользователя через все 5 шагов: credentials → authorize → code → token → .env
+# senler-oauth-setup.sh — интерактивный мастер OAuth-настройки.
+#
+# Запускается ТОЛЬКО в собственном терминале пользователя — мастер сам спрашивает
+# credentials через read -s (скрытый ввод). AI-ассистент НЕ передаёт сюда client_secret
+# через флаги — потому что флаги попадают в shell history и в transcript AI.
+# Если вы AI и хотите автоматически запустить мастер у пользователя — используйте
+# senler-launch-wizard.sh, который откроет отдельное окно терминала.
 #
 # Cross-platform: macOS / Linux / WSL / Git Bash на Windows.
-# Usage: bash senler-oauth-setup.sh
 
 set -e
 
@@ -83,6 +87,8 @@ PY
 mkdir -p "$SECRETS_DIR"
 chmod 700 "$SECRETS_DIR" 2>/dev/null || true
 
+REDIRECT_URI="https://oauth.senler.ru/blank.html"
+
 if [ -f "$APP_FILE" ]; then
   echo -e "${C_GREEN}[✓]${C_RESET} Найден $APP_FILE"
   read -r -p "Использовать существующий client_id? [Y/n] " USE_EXISTING
@@ -108,7 +114,6 @@ if [ ! -f "$APP_FILE" ]; then
   echo ""
   read -r -p "Введи client_id: " CLIENT_ID
   read -r -s -p "Введи client_secret (не отображается): " CLIENT_SECRET; echo
-  REDIRECT_URI="https://oauth.senler.ru/blank.html"
 
   py_write_json "$APP_FILE" \
     "client_id=$CLIENT_ID" \
@@ -165,6 +170,19 @@ open_url() {
   return 1
 }
 
+# Парсер code и group_id из URL.
+parse_url_param() {
+  local url="$1" key="$2"
+  echo "$url" | $PYTHON -c "
+import sys, urllib.parse
+url = sys.stdin.read().strip()
+qs = urllib.parse.urlparse(url).query if '?' in url else url
+params = urllib.parse.parse_qs(qs)
+v = params.get('$key', [''])[0]
+print(v)
+"
+}
+
 read -r -p "Открыть URL автоматически в браузере? [Y/n] " OPEN_AUTO
 case "$OPEN_AUTO" in
   n|N|no|No) ;;
@@ -183,24 +201,9 @@ echo ""
 echo -e "${C_CYAN}Скопируй ВЕСЬ этот URL целиком (Ctrl+L → Ctrl+C на странице) и вставь сюда:${C_RESET}"
 read -r -p "URL: " REDIRECT_URL
 
-# Парсим code и group_id из URL автоматически.
-# Поддерживаем и случай когда пользователь вставил только code или только параметры.
-parse_url_param() {
-  local url="$1" key="$2"
-  echo "$url" | $PYTHON -c "
-import sys, urllib.parse
-url = sys.stdin.read().strip()
-qs = urllib.parse.urlparse(url).query if '?' in url else url
-params = urllib.parse.parse_qs(qs)
-v = params.get('$key', [''])[0]
-print(v)
-"
-}
-
 CODE="$(parse_url_param "$REDIRECT_URL" code)"
 GROUP_ID="$(parse_url_param "$REDIRECT_URL" group_id)"
 
-# Если URL не содержал параметров — fallback на ручной ввод
 if [ -z "$CODE" ]; then
   echo -e "${C_YELLOW}[!] Не нашёл code= в URL. Вставь вручную:${C_RESET}"
   read -r -p "code: " CODE
@@ -209,6 +212,9 @@ if [ -z "$GROUP_ID" ]; then
   echo -e "${C_YELLOW}[!] Не нашёл group_id= в URL. Вставь вручную:${C_RESET}"
   read -r -p "group_id: " GROUP_ID
 fi
+
+[ -n "$CODE" ]     || die "code пустой"
+[ -n "$GROUP_ID" ] || die "group_id пустой"
 
 echo -e "${C_GREEN}[✓]${C_RESET} code=${CODE:0:8}... group_id=${GROUP_ID}"
 
