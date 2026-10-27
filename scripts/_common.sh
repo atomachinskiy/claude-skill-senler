@@ -81,7 +81,7 @@ senler_api() {
   _response=$(curl -s --max-time 30 -X POST \
     -H "Content-Type: application/x-www-form-urlencoded" \
     --data "$_body" \
-    "https://senler.ru/api/${_method}")
+    "${SENLER_API_BASE:-https://senler.ru/api}/${_method}")
   _last_api_call=$(date +%s)
 
   # Surface API errors to stderr (don't swallow)

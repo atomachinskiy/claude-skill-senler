@@ -19,7 +19,8 @@ $SkillDir    = Join-Path $env:USERPROFILE '.claude\skills\senler'
 $SecretsDir  = Join-Path $env:USERPROFILE '.claude\secrets'
 $AppFile     = Join-Path $SecretsDir 'senler-app.json'
 $EnvFile     = Join-Path $SkillDir 'config\.env'
-$RedirectUri = 'https://oauth.senler.ru/blank.html'
+# Домена oauth.senler.ru больше нет (27.10.2026): адрес возврата спрашиваем у человека.
+$RedirectUri = ''
 
 function Write-Step($msg)  { Write-Host ""; Write-Host "[>] $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)    { Write-Host "[+] $msg" -ForegroundColor Green }
@@ -50,13 +51,18 @@ if (-not $reuse) {
     Write-Host ""
     Write-Host "=== Шаг 1: создание OAuth-приложения в Senler ===" -ForegroundColor Yellow
     Write-Host ""
+    Write-Host "Проще без OAuth: ключ API в настройках канала (запусти мастер без -OAuth)." -ForegroundColor Cyan
+    Write-Host ""
+    $RedirectUri = ((Read-Host 'Адрес возврата (любая рабочая страница, например адрес вашего сайта)') -replace '\s', '')
+    if (-not $RedirectUri) { Die 'Нужен адрес возврата.' }
+    Write-Host ""
     Write-Host "1. Открой https://senler.ru -> авторизуйся"
     Write-Host "2. Аватарка справа сверху -> 'Разработчикам'"
     Write-Host "3. '+ Добавить приложение'"
     Write-Host "4. Заполни:"
     Write-Host "   - Название: Claude AI Analyst"
     Write-Host "   - Интеграция: 'Авторизация на стороннем сайте (OAuth)'"
-    Write-Host "   - redirect_uri: $RedirectUri"
+    Write-Host "   - redirect url: $RedirectUri (ровно так же)"
     Write-Host "5. 'Сохранить' - увидишь client_id и client_secret"
     Write-Host ""
     Write-Warn "client_secret показывается ОДИН РАЗ - копируй сразу"

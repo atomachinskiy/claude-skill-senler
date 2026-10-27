@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 # senler-launch-wizard.sh — открывает отдельное окно терминала с подгруженной
-# командой запуска интерактивного мастера OAuth-настройки.
+# командой запуска интерактивного мастера настройки (по умолчанию ключ API, --oauth для OAuth).
 #
 # Зачем: AI-ассистент (например Claude Code) может запустить этот скрипт через Bash tool,
 # и у пользователя САМ откроется отдельный Terminal/PowerShell с командой setup.sh.
-# Пользователь вводит client_id/client_secret в этом отдельном окне (не в чате с AI),
-# мастер сохраняет токен в .env. AI секреты не видит — соблюдается граница безопасности.
+# Пользователь вводит ключ API (или client_id/client_secret) в этом отдельном окне,
+# а не в чате с AI; мастер сохраняет токен в .env. AI секреты не видит — соблюдается граница безопасности.
 #
 # Cross-platform: macOS / Linux / WSL / Git Bash на Windows.
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-WIZARD="$SCRIPT_DIR/senler-oauth-setup.sh"
+# По умолчанию подключение по ключу API (Настройки канала → Работа с API).
+# --oauth — старый путь через OAuth-приложение.
+WIZARD="$SCRIPT_DIR/senler-key-setup.sh"
+[ "${1:-}" = "--oauth" ] && WIZARD="$SCRIPT_DIR/senler-oauth-setup.sh"
 
 [ -f "$WIZARD" ] || { echo "❌ Не найден $WIZARD"; exit 1; }
 

@@ -1,168 +1,66 @@
-# Senler API — пошаговая инструкция подключения
+# Senler API — подключение
 
-> Эта инструкция превращает «у меня есть Senler-канал» в «AI читает мою аналитику».
-> Занимает 5-7 минут.
+> Обновлено 27.10.2026. Основной способ теперь ключ API из настроек канала: приложение и OAuth не нужны.
+> Старый адрес возврата `https://oauth.senler.ru/blank.html` больше не работает: домена `oauth.senler.ru` нет, Senler отвечает «Неверный адрес».
 
-## 🚀 Быстрый путь — мастер настройки
+## Быстрый путь: мастер по ключу API (2–3 минуты)
 
-В терминале:
+1. В Senler откройте нужный канал → «Настройки» → «Работа с API» → создайте ключ. На канал можно до 20 ключей.
+2. Запустите мастер в отдельном окне терминала, чтобы ключ не попал в чат с ИИ:
+   - macOS / Linux: `bash ~/.claude/skills/senler/scripts/senler-launch-wizard.sh`
+   - Windows (PowerShell): `powershell -ExecutionPolicy Bypass -File "$HOME\.claude\skills\senler\scripts\senler-launch-wizard.ps1"`
+3. В окне вставьте ключ (ввод скрыт) и ID канала. Подойдёт любое из:
+   - ID сообщества ВКонтакте: число из ссылки `vk.com/club123456`, можно вставить ссылку целиком;
+   - ID канала в Senler;
+   - для канала в Telegram: ID бота, цифры токена бота до двоеточия.
+4. Мастер сам проверит ключ запросом `groups/get`, найдёт канал, сохранит `config/.env` (права 600) и покажет число подписчиков. В конце: «Senler настроен».
 
-```bash
-bash ~/.claude/skills/senler/scripts/senler-oauth-setup.sh
-```
+API принимает канал в любом из параметров `group_id`, `vk_group_id`, `tg_bot_id`, `max_bot_id`; мастер перебирает их и записывает в `.env` настоящий `group_id` канала в Senler.
 
-Мастер интерактивно проведёт через все шаги: подскажет где создать OAuth-приложение в Senler, спросит client_id/secret, откроет страницу авторизации в браузере, обменяет code на access_token и сохранит конфиг.
-
-Если что-то пошло не так или хочется сделать всё руками — пошаговая инструкция ниже.
-
----
-
-## Ручной способ (если мастер недоступен)
-
-## Шаг 1 — Войти в кабинет Senler
-
-Открой `https://senler.ru` и авторизуйся под админ-аккаунтом канала.
-
-## Шаг 2 — Создать OAuth-приложение
-
-В правом верхнем углу клик по аватарке → **«Разработчикам»**.
-
-Откроется раздел «Приложения». Кликни **«+ Добавить приложение»**.
-
-Заполни форму:
-- **Название:** `Claude AI Analyst` (или любое запоминаемое)
-- **Описание:** `AI-аналитик и сегментатор подписчиков` (не критично)
-- **Интеграция:** ✅ поставить галку **«Авторизация на стороннем сайте (OAuth)»**
-- **redirect_uri:** `https://oauth.senler.ru/blank.html`
-- **Категория:** `Аналитика`
-
-Нажми **«Сохранить»**.
-
-После сохранения Senler покажет два значения:
-- `client_id` — длинная hex-строка
-- `client_secret` — ещё одна длинная hex-строка
-
-⚠️ **`client_secret` показывается один раз** — скопируй его сразу.
-
-## Шаг 3 — Сохранить credentials в файл
-
-В терминале (любая ОС с bash):
+## Вручную (если мастер не запускается)
 
 ```bash
 bash -c '
-mkdir -p ~/.claude/secrets
-read -p "client_id: " CID
-read -s -p "client_secret: " CS; echo
-read -p "redirect_uri (то что указали в форме Senler): " RU
-printf "{\"client_id\":\"%s\",\"client_secret\":\"%s\",\"redirect_uri\":\"%s\"}\n" "$CID" "$CS" "$RU" > ~/.claude/secrets/senler-app.json
-chmod 600 ~/.claude/secrets/senler-app.json
-echo "✅ saved"
-'
-```
-
-Команда спросит три значения по очереди. `client_secret` вводится скрыто (не отображается на экране).
-
-После выполнения файл `~/.claude/secrets/senler-app.json` будет содержать твои креденшелы (права 600 — только владелец может читать).
-
-## Шаг 4 — Открыть authorize-страницу
-
-Скопируй URL ниже и подставь свой `client_id` (тот что видел на форме):
-
-```
-https://senler.ru/cabinet/OAuth2authorize?client_id=ТВОЙ_CLIENT_ID&redirect_uri=https%3A%2F%2Foauth.senler.ru%2Fblank.html&state=any-random-string
-```
-
-Открой в браузере где ты залогинен в Senler. Там покажет:
-- Название твоего приложения
-- Запрос разрешений
-- Дропдаун для выбора **канала** к которому даёшь доступ
-
-Выбери нужный канал (тот, аналитику которого хочешь смотреть) → нажми **«Разрешить»**.
-
-После разрешения тебя перебросит на `oauth.senler.ru/blank.html?code=XXXX&state=...&group_id=NNNN`.
-
-Из адресной строки нужны два значения:
-- `code` — длинная строка между `code=` и `&state`
-- `group_id` — число в конце URL
-
-## Шаг 5 — Обменять code на access_token
-
-В терминале:
-
-```bash
-bash -c '
-read -p "code (из URL): " CODE
-read -p "group_id (из URL, цифра): " GID
-APP=$(cat ~/.claude/secrets/senler-app.json)
-CID=$(echo "$APP" | python3 -c "import json,sys;print(json.load(sys.stdin)[\"client_id\"])")
-CS=$(echo "$APP" | python3 -c "import json,sys;print(json.load(sys.stdin)[\"client_secret\"])")
-RU=$(echo "$APP" | python3 -c "import json,sys;print(json.load(sys.stdin)[\"redirect_uri\"])")
-RESP=$(curl -s -G \
-    --data-urlencode "client_id=$CID" \
-    --data-urlencode "client_secret=$CS" \
-    --data-urlencode "redirect_uri=$RU" \
-    --data-urlencode "code=$CODE" \
-    --data-urlencode "group_id=$GID" \
-    "https://senler.ru/ajax/cabinet/OAuth2token")
-TOKEN=$(echo "$RESP" | python3 -c "import json,sys;print(json.load(sys.stdin)[\"access_token\"])")
+read -s -p "Ключ API: " KEY; echo
+read -p "group_id канала в Senler: " GID
 mkdir -p ~/.claude/skills/senler/config
-cat > ~/.claude/skills/senler/config/.env <<EOF
-SENLER_ACCESS_TOKEN=$TOKEN
-SENLER_GROUP_ID=$GID
-SENLER_V=2
-EOF
-chmod 600 ~/.claude/skills/senler/config/.env
-echo "✅ access_token saved to senler/config/.env"
+umask 077
+printf "SENLER_ACCESS_TOKEN=%s\nSENLER_GROUP_ID=%s\nSENLER_V=2\n" "$KEY" "$GID" > ~/.claude/skills/senler/config/.env
+echo "saved"
 '
-```
-
-Команда автоматически:
-1. Прочитает credentials из `~/.claude/secrets/senler-app.json`
-2. Обменяет `code` на `access_token` через Senler API
-3. Сохранит токен и `group_id` в `~/.claude/skills/senler/config/.env`
-
-## Шаг 6 — Проверка
-
-```bash
 bash ~/.claude/skills/senler/scripts/senler-subscribers-count.sh
 ```
 
-Должно вернуть число подписчиков канала. Если вернулось — всё работает.
+Знаете только ID сообщества ВК: узнайте `group_id` так (ключ подставьте в отдельном окне):
+
+```bash
+curl -s -X POST --data-urlencode "access_token=$KEY" --data "vk_group_id=123456&v=2" https://senler.ru/api/groups/get
+```
+
+## Ошибки
+
+| Код | Что значит | Что делать |
+|---|---|---|
+| 1 | Не передан канал | Нужен `group_id` (или `vk_group_id`, `tg_bot_id`, `max_bot_id`) |
+| 6 | Канал не найден | Проверьте ID и что ключ от этого же канала |
+| 9 | Больше 20 запросов в секунду на ключ | Повторить с задержкой |
+| 13, 14 | Ключ не найден или недействителен | Создать ключ заново в «Работа с API» |
+
+## Запасной путь: OAuth-приложение
+
+Нужен, только если ключи API недоступны. Мастер: `senler-launch-wizard.sh --oauth` (Windows: `senler-launch-wizard.ps1 -OAuth`).
+
+1. senler.ru → аватарка → «Разработчикам» → «Добавить приложение», отметить «Авторизация на стороннем сайте (OAuth)».
+2. Адрес возврата (redirect url): любая открывающаяся страница, например адрес вашего сайта. Мастер спросит этот адрес, в приложении он должен совпадать символ в символ.
+3. После «Разрешить» Senler перебросит на `ВАШ_АДРЕС?code=...&group_id=...`. Весь адрес из строки вставляется в окно мастера, он обменяет `code` на бессрочный токен (`https://senler.ru/ajax/cabinet/OAuth2token`). Код живёт 2,5 часа и одноразовый.
 
 ## После настройки
 
-Дальше можно использовать любой скрипт из скилла:
-
 ```bash
-bash ~/.claude/skills/senler/scripts/senler-bots-list.sh        # карта воронок
-bash ~/.claude/skills/senler/scripts/senler-bot-steps.sh 123    # шаги воронки
-bash ~/.claude/skills/senler/scripts/senler-deliveries-stat.sh  # рассылки
-bash ~/.claude/skills/senler/scripts/senler-utms-stats.sh       # UTM-источники
+bash ~/.claude/skills/senler/scripts/senler-bots-list.sh        # боты: статус и публикация
+bash ~/.claude/skills/senler/scripts/senler-bot-steps.sh 123    # шаги бота и запуски каждого шага
+bash ~/.claude/skills/senler/scripts/senler-deliveries-stat.sh  # рассылки: доставлено, прочитано, переходы
+bash ~/.claude/skills/senler/scripts/senler-utms-stats.sh       # метки и источники
 ```
 
-Или попросить Claude:
-- «Проанализируй мой Senler канал»
-- «Покажи где люди отваливаются в воронке X»
-- «Найди молчунов на шаге N и поставь им тег»
-
-## Восстановление при проблемах
-
-| Симптом | Причина | Решение |
-|---|---|---|
-| `Miss group_id` | В config/.env нет `SENLER_GROUP_ID` | Перепроверить .env |
-| `Invalid code` | Code просрочен (живёт 2.5 часа) | Заново сделать шаг 4-5 |
-| `Token has been expired` | Токен отозван пользователем | Сделать шаг 4-5 заново |
-| `Permission denied` | Скрипт не executable | `chmod +x ~/.claude/skills/senler/scripts/*.sh` |
-
-## Безопасность
-
-- `~/.claude/secrets/senler-app.json` (`client_secret`) — НЕ передавать никому, не коммитить, не публиковать
-- `~/.claude/skills/senler/config/.env` (`access_token`) — то же самое
-- Оба файла должны быть `chmod 600` (только владелец читает)
-- Если токен утёк — отозвать его в кабинете Senler (Разработчикам → Приложения → выбрать → Отозвать доступ), и заново пройти шаги 4-5
-
-## Связанные ссылки
-
-- Senler API docs: https://help.senler.ru/senler/help/razrabotchikam/api
-- OAuth flow docs: https://help.senler.ru/senler/help/razrabotchikam/prilozheniya/varianty-integracii/oauth
-- Methods reference: https://help.senler.ru/senler/help/razrabotchikam/api/methods/boty
+Документация Senler: https://help.senler.ru/senler/help/razrabotchikam/api

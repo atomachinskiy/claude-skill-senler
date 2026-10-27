@@ -1,11 +1,11 @@
 ---
 name: senler
-description: Анализ воронок, подписчиков и рассылок в Senler (чат-боты VK через senler.ru/api). Используй когда пользователь просит посмотреть аналитику Senler-канала, найти проблемные шаги в воронке, посчитать конверсию, разобрать рассылки, сегментировать подписчиков или присвоить им теги. Работает через OAuth access_token, выдаваемый собственным приложением Senler.
+description: Анализ воронок, подписчиков и рассылок в Senler (чат-боты VK через senler.ru/api). Используй когда пользователь просит посмотреть аналитику Senler-канала, найти проблемные шаги в воронке, посчитать конверсию, разобрать рассылки, сегментировать подписчиков или добавить их в группы. Подключается по ключу API канала (Senler → Настройки → Работа с API), OAuth — запасной путь.
 ---
 
 # Senler — AI-аналитик и AI-сегментатор для VK чат-ботов
 
-Скилл подключается к Senler API (`senler.ru/api`) и даёт AI-агенту доступ к **аналитике** и **управлению подписчиками** в канале Senler. Использует OAuth-flow через приложение, созданное в кабинете Senler пользователем.
+Скилл подключается к Senler API (`senler.ru/api`) и даёт AI-агенту доступ к **аналитике** и **управлению подписчиками** в канале Senler. Подключается по ключу API из настроек канала (с 27.10.2026; приложение и OAuth не нужны).
 
 ## Когда использовать
 
@@ -20,55 +20,58 @@ description: Анализ воронок, подписчиков и рассыл
 ## Prereqs
 
 - `jq` (`brew install jq`)
-- `~/.claude/secrets/senler-app.json` — OAuth-приложение Senler (`client_id`, `client_secret`, `redirect_uri`)
 - `~/.claude/skills/senler/config/.env` — `SENLER_ACCESS_TOKEN`, `SENLER_GROUP_ID`, `SENLER_V=2`
 
-Полная инструкция подключения для нового пользователя — `config/setup-guide.md`.
+Полная инструкция подключения — `config/setup-guide.md`.
 
-Если у пользователя нет access_token — запусти мастер:
+Если `.env` нет, подключение по ключу API:
+1. Скажи человеку: в Senler откройте канал → «Настройки» → «Работа с API» → создайте ключ. Ключ вводится только в отдельном окне, в чат его не присылать.
+2. Открой мастер в отдельном окне (сам `senler-key-setup.*` через Bash tool не запускай, ключ попадёт в транскрипт):
+   - macOS / Linux: `bash ~/.claude/skills/senler/scripts/senler-launch-wizard.sh`
+   - Windows: `powershell -ExecutionPolicy Bypass -File "$(cygpath -w ~/.claude/skills/senler/scripts/senler-launch-wizard.ps1)"`
+3. Мастер спросит ключ и ID канала (ID сообщества ВК, ссылку на него, ID канала в Senler или ID бота Telegram), сам найдёт канал, сохранит `.env` и напишет «Senler настроен».
+4. Проверка: `senler-subscribers-count.sh`.
 
-```bash
-bash ~/.claude/skills/senler/scripts/senler-oauth-setup.sh
-```
-
-Он интерактивно проведёт через все 5 шагов OAuth-flow, обменяет code на токен, сохранит .env. Запасной ручной путь описан в `config/setup-guide.md`.
+⚠️ Адрес `https://oauth.senler.ru/blank.html` из старых инструкций мёртв (домена нет, Senler пишет «Неверный адрес»). OAuth только как запасной путь: `senler-launch-wizard.sh --oauth`, адрес возврата человек указывает свой.
 
 ## ВАЖНО: что МОЖНО и что НЕЛЬЗЯ через Senler API
 
 ### ✅ Через API ДОСТУПНО
 
-**Чтение (полная аналитика):**
-- `bots/get` — список всех воронок канала (ID, название, статус, дата создания, теги)
-- `bots/getSteps <bot_id>` — структура шагов одной воронки (ID, название, тип, lead_inc)
-- `subscribers/count` — общее число подписчиков
-- `subscribers/get` — список подписчиков (с фильтром по боту/группе/периоду), пагинация по 100
-- `subscribers/statSubscribe` — события подписок/отписок с источником
-- `subscribers/statCount` — агрегаты подписок/отписок за период
-- `deliveries/stat` — лог отправленных сообщений (вплоть до 2000 за один paginated запрос) с `is_read`, `error`
-- `deliveries/statCount` — агрегаты по рассылкам
-- `utms/statSubscribe` / `utms/statCount` — UTM-атрибуция (если UTM настроены в подписной странице)
-- `groups/get` — информация о канале (имя, VK external_id, workspace_id)
-- `subscribers/groups/get` — список тегов/групп подписчиков
+Список сверен с документацией 27.10.2026 (31 метод, https://help.senler.ru/senler/help/razrabotchikam/api/methods).
 
-**Управление подписчиками (write):**
-- `subscribers/add` — добавить нового подписчика
-- `subscribers/setData` — обновить данные подписчика
-- `subscribers/setGroup` — присвоить тег / группу подписчику
-- `subscribers/groups/create` — создать новую группу/тег для сегментации
-- `bots/addSubscriber <bot_id>` — запустить подписчика по конкретной воронке
-- `bots/delSubscriber <bot_id>` — выкинуть подписчика из конкретной воронки
+**Чтение (полная аналитика):**
+- `groups/get` — канал: `group_id` в Senler, название, тип (vk/tg), `external_id`
+- `bots/get` — боты канала: `bot_id`, `title`, `active` (1 запущен), `published` (0 — есть неопубликованные изменения), теги
+- `bots/getSteps bot_id=` — шаги бота: `step_id`, `title`, `type` (start/timer/action/if/message/dispatcher), `lead_inc` (сколько раз шаг запускался)
+- `subscribers/count`, `subscribers/get` — подписчики; фильтры `bot_id`, `step_id[]`, `ignore_bot_id`, `subscription_id[]`, рассылки (`read_delivery_id[]`, `ignore_read_delivery_id[]` …), даты, метки, `lead_status`, переменные; до 100 за раз, следующая страница по `offset_id` из ответа
+- `subscribers/statSubscribe`, `subscribers/statCount` — журнал и агрегаты подписок/отписок
+- `deliveries/get` — рассылки со статистикой: получатели, доставлено, ошибки, прочитано, переходы, отписки
+- `deliveries/stat`, `deliveries/statCount` — пословный лог доставки, обязательны `date_from`, `date_to` (`d.m.Y H:i:s`)
+- `subscriptions/get` — группы подписчиков
+- `utms/get`, `utms/statSubscribe`, `utms/statCount`, `utms/getLink` — метки и ссылки с ними
+- `vars/get`, `vars_global/get` — переменные
+
+**Управление (write):**
+- `subscriptions/add` / `edit` / `del` — группы подписчиков (это и есть «теги» для сегментов)
+- `subscribers/add` — добавить подписчика в группу (`subscription_id`, можно массив id), `subscribers/del` — убрать из группы
+- `bots/addSubscriber` / `bots/delSubscriber` — запустить подписчика по боту (можно с `step_id`) или убрать из бота
+- `vars/set` / `vars/del`, `vars_global/set` / `vars_global/del` — переменные
+- `utms/add` / `edit` / `del` — метки
+
+Канал в любом запросе можно передать как `group_id`, `vk_group_id`, `tg_bot_id` или `max_bot_id`.
 
 ### ❌ Через API НЕДОСТУПНО (только в UI Senler)
 
 - ❌ Создавать новых ботов / воронок (нет `bots/create`)
 - ❌ Редактировать шаги в существующих ботах — нельзя изменить текст сообщения, кнопки, триггеры (нет `bots/setSteps`, `bots/updateStep`)
-- ❌ Создавать / редактировать рассылки (нет `broadcasts/create`, `deliveries/create`)
+- ❌ Создавать / редактировать / запускать рассылки (есть только `deliveries/get`, `stat`, `statCount`)
 - ❌ Создавать триггеры на события сообщества
 - ❌ Читать **точный текст** сообщения внутри шага — API возвращает только название шага и его тип, не контент
 
 ### Реальный сценарий использования
 
-AI читает данные → находит проблемное место (молчуны, отписавшиеся, не дошедшие до продажи) → создаёт им тег через `subscribers/groups/create` + `subscribers/setGroup` → пользователь в UI Senler запускает re-engagement рассылку по этому тегу → AI читает результат и сравнивает с предыдущим.
+AI читает данные → находит проблемное место (молчуны, отписавшиеся, не дошедшие до продажи) → создаёт для них группу подписчиков `subscriptions/add` и добавляет их `subscribers/add` → пользователь в UI Senler запускает рассылку по этой группе → AI читает результат через `deliveries/get` и сравнивает с предыдущим.
 
 То есть скилл = **AI-аналитик + AI-сегментатор**. Создание ботов и запуск кампаний остаётся за командой в UI.
 
@@ -108,14 +111,16 @@ bash ~/.claude/skills/senler/scripts/senler-utms-stats.sh --from 2026-04-01 --to
 ### «Найди молчунов на шаге N в воронке X и поставь им тег»
 
 ```bash
-# 1. Найти подписчиков
-bash scripts/senler-call.sh subscribers/get bot_id=123 step_id=abc count=100
+# 1. Найти подписчиков на шаге (step_id из senler-bot-steps.sh)
+bash scripts/senler-call.sh subscribers/get bot_id=123 "step_id[]=5c35bb800b295034fa5062a6" count=100
 
-# 2. Создать тег
-bash scripts/senler-call.sh subscribers/groups/create name="Молчуны после шага N"
+# 2. Создать группу подписчиков (скрытую, чтобы не светилась на подписной странице)
+bash scripts/senler-call.sh subscriptions/add name="Молчуны после шага N" inactive=1
 
-# 3. Присвоить найденным
-bash scripts/senler-call.sh subscribers/setGroup vk_user_id=123456 group_id=NEW_TAG_ID
+# 3. Добавить найденных в группу (subscription_id из ответа шага 2)
+bash scripts/senler-call.sh subscribers/add vk_user_id=123456 subscription_id=NEW_ID
+
+# Всё это меняет живую базу: только после «да» человека.
 ```
 
 ### «Что-то нестандартное (метод не из списка)»
@@ -127,10 +132,11 @@ bash ~/.claude/skills/senler/scripts/senler-call.sh <ANY_METHOD> param=value
 
 ## Ограничения
 
-- **Лимит count:** максимум 100 на запрос. Для больших выгрузок (1000+ подписчиков) пагинируем через `offset`.
-- **Один токен = один канал.** Если у пользователя несколько каналов в Senler — токен на каждый отдельно. В `.env` за раз один.
-- **Токен бессрочный** (живёт до отзыва пользователем), `client_secret` нужен только при первичном обмене кода на токен.
-- **Rate limit** — Senler не публикует, скилл ставит задержку ~0.35с между запросами. Для больших выгрузок (10К+ подписчиков) использует пагинацию.
+- **Лимит count:** максимум 100 на запрос. Следующая страница `subscribers/get` и `deliveries/stat` — по `offset_id` из ответа, у `bots/get`, `deliveries/get`, `subscriptions/get` — `offset`.
+- **Один ключ = один канал.** Несколько каналов — ключ на каждый. В `.env` за раз один.
+- **Ключ бессрочный**, удаляется в «Работа с API». OAuth-токен тоже бессрочный.
+- **Rate limit:** 20 запросов в секунду на ключ, при превышении ошибка 9. Скилл ставит задержку ~0,35 с.
+- **Ошибки:** 6 — канал не найден, 13/14 — ключ не найден или недействителен.
 - **Текст сообщений в шагах НЕ доступен** — только название и тип шага.
 
 ## Файлы скилла
@@ -141,15 +147,18 @@ bash ~/.claude/skills/senler/scripts/senler-call.sh <ANY_METHOD> param=value
 ├── config/
 │   ├── .env.example                      # шаблон конфига
 │   ├── .env                              # реальный конфиг (gitignored)
-│   └── setup-guide.md                    # пошаговая инструкция подключения
+│   └── setup-guide.md                    # подключение по ключу, запасной OAuth
 ├── scripts/
 │   ├── _common.sh                        # обёртка POST → senler.ru/api/
+│   ├── senler-launch-wizard.sh / .ps1    # открывает мастер в отдельном окне
+│   ├── senler-key-setup.sh / .ps1        # мастер по ключу API
+│   ├── senler-oauth-setup.sh / .ps1      # мастер OAuth (запасной)
 │   ├── senler-subscribers-count.sh       # sanity-check + total subs
 │   ├── senler-bots-list.sh               # все воронки канала
 │   ├── senler-bot-steps.sh               # шаги одной воронки
 │   ├── senler-subscribers-list.sh        # пагинация подписчиков
 │   ├── senler-utms-stats.sh              # UTM-источники
-│   ├── senler-deliveries-stat.sh         # статистика рассылок
+│   ├── senler-deliveries-stat.sh         # рассылки: доставлено, прочитано, переходы
 │   └── senler-call.sh                    # raw-вызов любого метода
 └── cache/                                # кеш (если используется)
 ```
@@ -158,4 +167,5 @@ bash ~/.claude/skills/senler/scripts/senler-call.sh <ANY_METHOD> param=value
 
 - API Senler: https://help.senler.ru/senler/help/razrabotchikam/api
 - Methods reference: https://help.senler.ru/senler/help/razrabotchikam/api/methods/boty
-- OAuth flow: https://help.senler.ru/senler/help/razrabotchikam/prilozheniya/varianty-integracii/oauth
+- Ключи доступа: https://help.senler.ru/senler/help/razrabotchikam/api/klyuchi-dostupa
+- OAuth flow (запасной): https://help.senler.ru/senler/help/razrabotchikam/prilozheniya/varianty-integracii/oauth

@@ -87,7 +87,9 @@ PY
 mkdir -p "$SECRETS_DIR"
 chmod 700 "$SECRETS_DIR" 2>/dev/null || true
 
-REDIRECT_URI="https://oauth.senler.ru/blank.html"
+# Адрес возврата: домена oauth.senler.ru больше нет (27.10.2026), поэтому спрашиваем свой.
+# Подойдёт любая открывающаяся страница: после «Разрешить» нужен только адрес из адресной строки.
+REDIRECT_URI=""
 
 if [ -f "$APP_FILE" ]; then
   echo -e "${C_GREEN}[✓]${C_RESET} Найден $APP_FILE"
@@ -101,13 +103,19 @@ if [ ! -f "$APP_FILE" ]; then
   echo ""
   echo -e "${C_YELLOW}═══ Шаг 1: Создание OAuth-приложения в Senler ═══${C_RESET}"
   echo ""
+  echo -e "${C_CYAN}Проще без OAuth: ключ API в настройках канала (запусти мастер без --oauth).${C_RESET}"
+  echo ""
+  read -r -p "Адрес возврата (любая рабочая страница, например адрес вашего сайта): " REDIRECT_URI
+  REDIRECT_URI=$(printf '%s' "$REDIRECT_URI" | tr -d '[:space:]')
+  [ -n "$REDIRECT_URI" ] || { echo "Нужен адрес возврата."; exit 1; }
+  echo ""
   echo "1. Открой https://senler.ru → авторизуйся"
   echo "2. Аватарка справа сверху → «Разработчикам»"
   echo "3. «+ Добавить приложение»"
   echo "4. Заполни:"
   echo "   • Название: Claude AI Analyst"
   echo "   • Интеграция: ✅ «Авторизация на стороннем сайте (OAuth)»"
-  echo "   • redirect_uri: https://oauth.senler.ru/blank.html"
+  echo "   • redirect url: $REDIRECT_URI (ровно так же)"
   echo "5. «Сохранить» — увидишь client_id и client_secret"
   echo ""
   echo -e "${C_RED}[!] client_secret показывается ОДИН РАЗ — копируй сразу${C_RESET}"
@@ -141,7 +149,7 @@ echo ""
 echo -e "${C_CYAN}${AUTH_URL}${C_RESET}"
 echo ""
 echo "→ выбери канал → нажми «Разрешить»"
-echo "→ перебросит на страницу oauth.senler.ru/blank.html?code=XXXX&state=...&group_id=NNNN"
+echo "→ перебросит на страницу $REDIRECT_URI?code=XXXX&state=...&group_id=NNNN"
 echo "→ сама страница может быть пустой — нужен только URL из адресной строки"
 echo ""
 echo -e "${C_RED}[!] code в URL ОДНОРАЗОВЫЙ и быстро устаревает.${C_RESET}"
@@ -196,7 +204,7 @@ esac
 echo ""
 echo "После «Разрешить» Senler перебросит тебя на страницу — она может выглядеть пустой."
 echo "В адресной строке будет URL вида:"
-echo "    https://oauth.senler.ru/blank.html?code=XXXX&state=...&group_id=NNNN"
+echo "    $REDIRECT_URI?code=XXXX&state=...&group_id=NNNN"
 echo ""
 echo -e "${C_CYAN}Скопируй ВЕСЬ этот URL целиком (Ctrl+L → Ctrl+C на странице) и вставь сюда:${C_RESET}"
 read -r -p "URL: " REDIRECT_URL
@@ -246,7 +254,7 @@ if [ -z "$TOKEN" ]; then
       echo -e "${C_YELLOW}Проверь:${C_RESET}"
       echo "  • client_id и client_secret скопированы без пробелов"
       echo "  • code и group_id взяты из СВЕЖЕГО URL после «Разрешить»"
-      echo "  • redirect_uri в приложении Senler ровно: https://oauth.senler.ru/blank.html"
+      echo "  • redirect url в приложении Senler ровно: $REDIRECT_URI"
       ;;
   esac
   exit 1

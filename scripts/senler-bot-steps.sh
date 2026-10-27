@@ -34,8 +34,8 @@ fi
   echo ""
   echo "$DATA" | $JQ -r '
     (.items // .steps // []) | to_entries[] |
-    "\(.key + 1)|\(.value.step_id // .value.id // "?")|\(.value.name // .value.title // .value.text // "Untitled" | gsub("\n"; " ") | .[0:80])|\(.value.subscribers_count // "?")"
-  ' | while IFS='|' read -r num id name subs; do
-    echo "${num}. [${id}] ${name}  —  на шаге: ${subs}"
+    "\(.key + 1)|\(.value.step_id // .value.id // "?")|\(.value.title // .value.name // "Untitled" | gsub("\n"; " ") | .[0:80])|\(.value.type // "?")|\(.value.lead_inc // "?")"
+  ' | while IFS='|' read -r num id name type runs; do
+    echo "${num}. [${id}] ${name} (${type})  —  запусков шага: ${runs}"
   done
 } | limit_output

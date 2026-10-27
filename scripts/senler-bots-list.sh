@@ -32,8 +32,8 @@ N=$(echo "$DATA" | $JQ -r '(.items // .bots // []) | length')
 
   echo "$DATA" | $JQ -r '
     (.items // .bots // []) | to_entries[] |
-    "\(.key + 1)|\(.value.bot_id // .value.id // "?")|\(.value.name // .value.title // "Untitled")|\(.value.subscribers_count // .value.count // "?")"
-  ' | while IFS='|' read -r num id name subs; do
-    echo "${num}. [${id}] ${name}  —  подписчиков: ${subs}"
+    "\(.key + 1)|\(.value.bot_id // .value.id // "?")|\(.value.title // .value.name // "Untitled")|\(if .value.active == 1 then "запущен" elif .value.active == 0 then "остановлен" else "?" end)|\(if .value.published == 0 then ", есть неопубликованные изменения" else "" end)|\(.value.date // "")"
+  ' | while IFS='|' read -r num id name status pub date; do
+    echo "${num}. [${id}] ${name}  —  ${status}${pub}  (создан ${date})"
   done
 } | limit_output
