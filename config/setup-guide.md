@@ -10,7 +10,7 @@
    - macOS / Linux: `bash ~/.claude/skills/senler/scripts/senler-launch-wizard.sh`
    - Windows (PowerShell): `powershell -ExecutionPolicy Bypass -File "$HOME\.claude\skills\senler\scripts\senler-launch-wizard.ps1"`
 3. В окне вставьте ключ (ввод скрыт) и ID канала. Подойдёт любое из:
-   - ID сообщества ВКонтакте: число из ссылки `vk.com/club123456`, можно вставить ссылку целиком;
+   - ID сообщества ВКонтакте: число из ссылки `vk.com/club123456`, можно вставить ссылку целиком или ссылку на любой пост сообщества (`wall-123456_…`);
    - ID канала в Senler;
    - для канала в Telegram: ID бота, цифры токена бота до двоеточия.
 4. Мастер сам проверит ключ запросом `groups/get`, найдёт канал, сохранит `config/.env` (права 600) и покажет число подписчиков. В конце: «Senler настроен».

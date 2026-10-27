@@ -62,6 +62,7 @@ function Find-Group($key, $id) {
 function Get-ChannelId($raw) {
     $s = ($raw -replace '\s', '')
     if ($s -match '(club|public)(\d+)') { return $Matches[2] }
+    if ($s -match 'wall-(\d+)')         { return $Matches[1] }
     if ($s -match 'group_id=(\d+)')     { return $Matches[1] }
     if ($s -match '^(\d+):')            { return $Matches[1] }
     return ($s -replace '\D', '')
@@ -82,7 +83,7 @@ while ($attempt -lt 3) {
     }
     Write-Host ''
     Write-Host 'ID канала. Подойдёт любое из:'
-    Write-Host '  - ID сообщества ВКонтакте: число из ссылки vk.com/club123456 или сама ссылка;'
+    Write-Host '  - ID сообщества ВКонтакте: число из ссылки vk.com/club123456, сама ссылка или ссылка на пост;'
     Write-Host '  - ID канала в Senler: число из адресной строки кабинета;'
     Write-Host '  - для канала в Telegram: ID бота, первые цифры токена бота до двоеточия.'
     $chId = Get-ChannelId (Read-Host 'ID канала')

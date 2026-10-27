@@ -60,10 +60,11 @@ try_group() {
 }
 
 parse_id() {
-  # ссылка vk.com/club123 или public123, ?group_id=123, просто число, ID бота из токена
+  # ссылка vk.com/club123, public123, пост wall-123_45, ?group_id=123, число, ID бота из токена
   _s=$(printf '%s' "$1" | tr -d '[:space:]')
   case "$_s" in
     *club[0-9]*|*public[0-9]*) printf '%s' "$_s" | sed -E 's/.*(club|public)([0-9]+).*/\2/' ;;
+    *wall-[0-9]*)              printf '%s' "$_s" | sed -E 's/.*wall-([0-9]+).*/\1/' ;;
     *group_id=[0-9]*)          printf '%s' "$_s" | sed -E 's/.*group_id=([0-9]+).*/\1/' ;;
     [0-9]*:*)                  printf '%s' "${_s%%:*}" ;;
     *)                         printf '%s' "$_s" | tr -cd '0-9' ;;
@@ -81,7 +82,7 @@ while [ $attempt -lt 3 ]; do
   fi
   echo
   echo "ID канала. Подойдёт любое из:"
-  echo "  • ID сообщества ВКонтакте: число из ссылки vk.com/club123456 или сама ссылка;"
+  echo "  • ID сообщества ВКонтакте: число из ссылки vk.com/club123456, сама ссылка или ссылка на пост;"
   echo "  • ID канала в Senler: число из адресной строки кабинета;"
   echo "  • для канала в Telegram: ID бота, первые цифры токена бота до двоеточия."
   read -r -p "ID канала: " RAW_ID || die "Ввод прервался."
